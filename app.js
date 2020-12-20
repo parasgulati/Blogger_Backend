@@ -14,7 +14,7 @@ require('dotenv/config');
 const Registration = require('./models/Registration');
 const Business = require('./models/Business');
 const Item = require('./models/Item');
-
+const Order = require('./models/Order');
 
 // MongoDB connect
 
@@ -35,6 +35,38 @@ API.use(bodyParser.json());
 
 // adding body-parser URL Encoded middleware for accessing URLEncoded data
 API.use(bodyParser.urlencoded({extended: false}));
+
+API.post('/place-order-business',(req,res,next)=>{
+	var post = req.body;
+	
+	var obj = new Order({
+		Country_Code:post.Country_Code,
+		Phone_Number:post.Phone_Number,
+		Name:post.Name,	
+		Type:post.Type,
+		Category:post.Category,
+		Address:post.Address
+	});
+	
+	obj.save(function(err,data){
+		if(err)
+		{
+			res.json({
+				status:500,
+				message:"Internal Server Error"
+			}).send();
+		}
+		else
+		{
+			res.json({
+				status:200,
+				message:"Success",
+				Order_Id:data._id;
+			}).send();
+		}
+	})
+})
+
 
 
 API.post('/register-user',(req,res,next)=>{
@@ -161,9 +193,9 @@ API.post('/create-new-business',(req,res,next)=>{
 
 API.post('/remove-business',(req,res,next)=>{
 	var post=req.body;
-	
-	Business.deleteMany({_id:{$in:post.Business_Ids}},function(err,data){
-						if(err)
+
+	Business.deleteMany({_id:{$in:post.Business_Ids}},function(err1,data1){
+						if(err1)
 						{
 							res.json({
 									status:500,
@@ -172,13 +204,106 @@ API.post('/remove-business',(req,res,next)=>{
 						}
 						else
 						{
-							res.json({
-								status:200,
-								message:'Success'
-							}).send();
+							Item.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err2,data2){
+								if(err2)
+								{
+									res.json({
+										status:500,
+										message:'Internal Server Error'
+									}).send();
+								}
+								else
+								{
+									res.json({
+										status:200,
+										message:'Success'
+									}).send();
+								}
+							})
 						}
 					})
 })
+
+API.post('/query',(req,res,next)=>{
+	var post=req.body;
+	
+	var total_length = post.query.length;
+	var get_starting = Math.ceil((20/100)*total_length);
+	var s = post.query.substring(0,get_starting);
+	
+	var search_string = "^"+s;
+	Business.find({"Name":{$regex:search_string,$options:'i'}},function(err,data){
+		if(err)
+		{
+			res.json({
+				status:500,
+				message:"Internal Server Error"
+			}).send();
+		}
+		else if(data.length!=0)
+		{
+			var ans=[];
+			for(var i=0;i<data.length;i++)
+			{
+				var string1 = post.query.toLowerCase();
+				var string2 = data[i].Name.toLowerCase();
+				
+				var arrayLCS=new Array(string1.length+1);
+				
+				for(var k=0;k<=string1.length;k++)
+                    arrayLCS[k]=new Array(string2.length+1);
+				
+                for(var k=0;k<=string1.length;k++)
+                    arrayLCS[k][0]=0;
+                for(var k=0;k<=string2.length;k++)
+                    arrayLCS[0][k]=0;
+				
+				var max = 0;
+				
+                for(var k=1;k<=string1.length;k++)
+                {
+                    for(var p=1;p<=string2.length;p++)
+                    {      
+                        if(string1[k-1] == string2[p-1])
+                            arrayLCS[k][p]=arrayLCS[k-1][p-1]+1;
+                        else
+                        {
+                            var firstTemp = arrayLCS[k-1][p];
+                            var secondTemp = arrayLCS[k][p-1];
+                            if(firstTemp>secondTemp)
+                                arrayLCS[k][p]=firstTemp;
+                            else
+                                arrayLCS[k][p]=secondTemp;
+                        }
+                        if(arrayLCS[k][p]>max)
+                        {
+                            max=arrayLCS[k][p];
+                        }
+                    }
+                }
+				if(((max*100)/Math.max(string1.length,string2.length))>=80)
+				{
+					ans.push(data[i]);
+				}
+			}
+			res.json({
+				status:200,
+				message:"Success",
+				businesses:ans
+			}).send();
+		}
+		else
+		{
+			res.json({
+				status:200,
+				message:"Success",
+				businesses:[]
+			}).send();
+		}
+	})
+	
+})
+
 
 API.post('/fetch-all-items-in-a-business',(req,res,next)=>{
 	var post = req.body;
@@ -269,7 +394,33 @@ API.post('/remove-items',(req,res,next)=>{
 					})
 })
 
-
+API.post('/check-phone-number-already-registered',(req,res,next)=>{
+	var post=req.body;
+	
+	Registration.findOne({Phone_Number:post.Phone_Number, Country_Code:post.Country_Code},function(err,data){
+						if(err)
+						{
+							res.json({
+									status:500,
+									message:'Internal Server Error'
+								}).send();
+						}
+						else if(data==null)
+						{
+							res.json({
+								status:200,
+								message:'Not Registered'
+							}).send();
+						}
+						else
+						{
+							res.json({
+								status:200,
+								message:'Already Registered'
+							}).send();
+						}
+	})
+})
 
 
 
