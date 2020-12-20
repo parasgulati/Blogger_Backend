@@ -5,6 +5,7 @@ const Order = mongoose.Schema({
 	Name:{type:String},	
 	Type:{type:String},
 	Category:{type:String},
-	Address:{type:String}
+	Address:{type:String},
+	Amount:{type:String}
 });
 module.exports = mongoose.model("Order",Order);

@@ -45,7 +45,8 @@ API.post('/place-order-business',(req,res,next)=>{
 		Name:post.Name,	
 		Type:post.Type,
 		Category:post.Category,
-		Address:post.Address
+		Address:post.Address,
+		Amount:post.Amount
 	});
 	
 	obj.save(function(err,data){
@@ -61,7 +62,7 @@ API.post('/place-order-business',(req,res,next)=>{
 			res.json({
 				status:200,
 				message:"Success",
-				Order_Id:data._id;
+				Order_Id:data._id
 			}).send();
 		}
 	})
