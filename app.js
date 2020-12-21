@@ -16,6 +16,13 @@ const Business = require('./models/Business');
 const Item = require('./models/Item');
 const Order = require('./models/Order');
 
+
+// paytm requirement
+
+const ejs = require("ejs");
+const {initPayment, responsePayment} = require("./paytm/services/index");
+
+
 // MongoDB connect
 
 mongoose.connect('mongodb+srv://'+process.env.MONGODB_USER+':'+process.env.MONGODB_PASSWORD+'@cluster0.1b7a3.mongodb.net/'+process.env.MONGODB_DBNAME+'?retryWrites=true&w=majority',{'useUnifiedTopology':true})
@@ -36,37 +43,38 @@ API.use(bodyParser.json());
 // adding body-parser URL Encoded middleware for accessing URLEncoded data
 API.use(bodyParser.urlencoded({extended: false}));
 
-API.post('/place-order-business',(req,res,next)=>{
-	var post = req.body;
-	
-	var obj = new Order({
-		Country_Code:post.Country_Code,
-		Phone_Number:post.Phone_Number,
-		Name:post.Name,	
-		Type:post.Type,
-		Category:post.Category,
-		Address:post.Address,
-		Amount:post.Amount
-	});
-	
-	obj.save(function(err,data){
-		if(err)
-		{
-			res.json({
-				status:500,
-				message:"Internal Server Error"
-			}).send();
-		}
-		else
-		{
-			res.json({
-				status:200,
-				message:"Success",
-				Order_Id:data._id
-			}).send();
-		}
-	})
-})
+
+// paytm
+API.use(express.static(__dirname + "/views"));
+API.set("view engine", "ejs");
+
+API.get("/paywithpaytm", (req, res) => {
+    initPayment(req.query.amount).then(
+        success => {
+            res.render("paytmRedirect.ejs", {
+                resultData: success,
+                paytmFinalUrl: process.env.PAYTM_FINAL_URL
+            });
+        },
+        error => {
+            res.send(error);
+        }
+    );
+});
+
+API.post("/paywithpaytmresponse", (req, res) => {
+    responsePayment(req.body).then(
+        success => {
+            res.render("response.ejs", {resultData: "true", responseData: success});
+        },
+        error => {
+            res.send(error);
+        }
+    );
+});
+
+
+
 
 
 
@@ -544,5 +552,5 @@ API.post('/chat',(req,res,next)=>{
 	})
 })
 
-var port =process.env.PORT|3000;
+var port =process.env.PORT || 3000;
 API.listen(port);

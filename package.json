@@ -4,16 +4,19 @@
   "description": "A MEAN app that allows users to manage contact lists",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "test",
     "start": "node app.js"
   },
   "dependencies": {
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
+    "ejs": "^2.7.4",
     "express": "^4.17.1",
     "mongodb": "^2.1.6",
     "mongoose": "^5.9.7",
-    "paytmchecksum": "^1.5.0"
+    "paytmchecksum": "^1.5.0",
+    "shortid": "^2.2.16",
+    "stripe": "^8.129.0"
   }
 }
