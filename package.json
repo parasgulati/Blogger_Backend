@@ -17,6 +17,7 @@
     "mongoose": "^5.9.7",
     "paytmchecksum": "^1.5.0",
     "shortid": "^2.2.16",
-    "stripe": "^8.129.0"
+    "stripe": "^8.129.0",
+    "sync-loop": "^0.1.1"
   }
 }

@@ -1,23 +1,41 @@
 const checksum = require('../lib/checksum');
 const config = require('../config');
-const shortid = require('shortid');
+require('dotenv/config');
 
-const initPayment = function(amount) {
+const initPayment = function(amount,Customer_Id,CreateBusiness,Order_Id) {
   return new Promise((resolve, reject) => {
-    let paymentObj = {
-      ORDER_ID: shortid.generate(),
-      CUST_ID: shortid.generate(),
-      INDUSTRY_TYPE_ID: config.INDUSTRY_TYPE_ID,
-      CHANNEL_ID: config.CHANNEL_ID,
-      TXN_AMOUNT: amount.toString(),
-      MID: config.MID,
-      WEBSITE: config.WEBSITE,
-      CALLBACK_URL: config.CALLBACK_URL
-    };
-
+	  var paymentObj;
+	  
+	  if(CreateBusiness==1)
+	  {
+		paymentObj = {
+		  ORDER_ID: Order_Id,
+		  CUST_ID: Customer_Id,
+		  INDUSTRY_TYPE_ID: process.env.INDUSTRY_TYPE_ID,
+		  CHANNEL_ID: process.env.CHANNEL_ID,
+		  TXN_AMOUNT: amount.toString(),
+		  MID: process.env.MID,
+		  WEBSITE: process.env.WEBSITE,
+		  CALLBACK_URL: process.env.CALLBACK_URL_CREATE
+		 };
+	  }
+	  else
+	  {
+		  paymentObj = {
+		  ORDER_ID: Order_Id,
+		  CUST_ID: Customer_Id,
+		  INDUSTRY_TYPE_ID: process.env.INDUSTRY_TYPE_ID,
+		  CHANNEL_ID: process.env.CHANNEL_ID,
+		  TXN_AMOUNT: amount.toString(),
+		  MID: process.env.MID,
+		  WEBSITE: process.env.WEBSITE,
+		  CALLBACK_URL: process.env.CALLBACK_URL
+		};
+	  }
+    
     checksum.genchecksum(
       paymentObj,
-      config.PAYTM_MERCHANT_KEY,
+      process.env.PAYTM_MERCHANT_KEY,
       (err, result) => {
         if (err) {
           return reject('Error while generating checksum');
@@ -35,7 +53,7 @@ const responsePayment = function(paymentObject) {
     if (
       checksum.verifychecksum(
         paymentObject,
-        config.PAYTM_MERCHANT_KEY,
+        process.env.PAYTM_MERCHANT_KEY,
         paymentObject.CHECKSUMHASH
       )
     ) {

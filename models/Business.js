@@ -5,6 +5,7 @@ const Business = mongoose.Schema({
 	Name:{type:String},	
 	Type:{type:String},
 	Category:{type:String},
-	Address:{type:String}
+	Address:{type:String},
+	Status:{type:Boolean}
 });
 module.exports = mongoose.model("Business",Business);

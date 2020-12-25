@@ -14,13 +14,15 @@ require('dotenv/config');
 const Registration = require('./models/Registration');
 const Business = require('./models/Business');
 const Item = require('./models/Item');
+const Transaction = require('./models/Transaction');
 const Order = require('./models/Order');
-
+const Service_Order = require('./models/Service_Order');
+const Service_Expiry = require('./models/Service_Expiry');
 
 // paytm requirement
 
 const ejs = require("ejs");
-const {initPayment, responsePayment} = require("./paytm/services/index");
+const {initPayment, responsePayment} = require("./Paytm/services/index");
 
 
 // MongoDB connect
@@ -49,23 +51,93 @@ API.use(express.static(__dirname + "/views"));
 API.set("view engine", "ejs");
 
 API.get("/paywithpaytm", (req, res) => {
-    initPayment(req.query.amount).then(
-        success => {
-            res.render("paytmRedirect.ejs", {
-                resultData: success,
-                paytmFinalUrl: process.env.PAYTM_FINAL_URL
-            });
-        },
-        error => {
-            res.send(error);
-        }
-    );
+	
+		initPayment(req.query.amount,req.query.Customer_Id,req.query.CreateBusiness,req.query.Order_Id).then(
+			success => {
+				res.render("paytmRedirect.ejs", {
+					resultData: success,
+					paytmFinalUrl: process.env.PAYTM_FINAL_URL
+				});
+			},
+			error => {
+				res.send(error);
+			}
+		);
 });
 
 API.post("/paywithpaytmresponse", (req, res) => {
     responsePayment(req.body).then(
         success => {
-            res.render("response.ejs", {resultData: "true", responseData: success});
+			var post = req.body;
+			
+			Service_Order.findOne({_id:post.ORDERID},function(err1,data1){
+				if(err1)
+				{
+					res.json({
+						status:500,
+						message:"Internal Server Error"
+					}).send();
+				}
+				else
+				{
+					Service_Expiry.findOne({Business_Id:data1.Business_Id},function(err2,data2){
+						if(err2)
+						{
+							res.status(500).json({
+								message:"Internal Server Error"
+							}).send();
+						}
+						else
+						{
+							var current_date = new Date();
+							var end_date = data2.Service_Period_End;
+							var new_end_date;
+							var new_start_date;
+							
+							if(current_date <= end_date)
+							{
+								end_date.setDate(end_date.getDate()+30);
+								new_end_date = end_date;
+							}
+							else
+							{
+								current_date.setDate(current_date.getDate()+30);
+								new_end_date = current_date;
+							}
+							Service_Expiry.updateOne({Business_Id:data1.Business_Id},{Service_Period_End:new_end_date},function(err3,data3){
+								if(err3)
+								{
+									res.status(500).json({
+										message:"Internal Server Error"
+									}).send();
+								}
+								else
+								{
+									var TransactionObj = new Transaction({
+												Business_Id:data1.Business_Id,
+												CURRENCY:post.CURRENCY,
+												GATEWAYNAME:post.GATEWAYNAME,
+												RESPMSG:post.RESPMSG,
+												BANKNAME:post.BANKNAME,
+												PAYMENTMODE:post.PAYMENTMODE,
+												MID:post.MID,
+												RESPCODE:post.RESPCODE,
+												TXNID:post.TXNID,
+												TXNAMOUNT:post.TXNAMOUNT,
+												ORDERID:post.ORDERID,
+												STATUS:post.STATUS,
+												BANKTXNID:post.BANKTXNID,
+												TXNDATE:post.TXNDATE,
+												CHECKSUMHASH:post.CHECKSUMHASH
+											});
+											TransactionObj.save();
+									res.render("response.ejs", {resultData: "true", responseData: success})		
+								}
+							})
+						}
+					})
+				}		
+			})			
         },
         error => {
             res.send(error);
@@ -73,9 +145,154 @@ API.post("/paywithpaytmresponse", (req, res) => {
     );
 });
 
+API.post("/paywithpaytmresponseCreate", (req, res) => {
+    responsePayment(req.body).then(
+        success =>
+		{
+					var post=req.body;
+					console.log(post.ORDERID);
+					Order.findOne({_id:post.ORDERID},function(err1,data1){
+						if(err1)
+						{
+							res.send(err1);
+						}
+						else
+						{	
+							const obj = new Business({
+								Country_Code:data1.Country_Code,
+								Phone_Number:data1.Phone_Number,
+								Name:data1.Name,	
+								Type:data1.Type,
+								Category:data1.Category,
+								Address:data1.Address,
+								Status:true
+							});
+	
+							Business.find(obj,function(err2,data2){
+								if(err2)
+								{
+									res.send(err2);
+								}
+								else if(data2.length==0)
+								{
+									obj.save(function(e,d){
+										if(e)
+										{								
+											res.send(e);
+										}
+										else
+										{
+											var date = new Date();
+											
+											date.setDate(date.getDate() + 30);		
+									
+											var ser_exp = new Service_Expiry({
+												Business_Id:d._id,
+												Service_Period_End:date
+											});
+											ser_exp.save();
+											
+											var TransactionObj = new Transaction({
+												Business_Id:d._id,
+												CURRENCY:post.CURRENCY,
+												GATEWAYNAME:post.GATEWAYNAME,
+												RESPMSG:post.RESPMSG,
+												BANKNAME:post.BANKNAME,
+												PAYMENTMODE:post.PAYMENTMODE,
+												MID:post.MID,
+												RESPCODE:post.RESPCODE,
+												TXNID:post.TXNID,
+												TXNAMOUNT:post.TXNAMOUNT,
+												ORDERID:post.ORDERID,
+												STATUS:post.STATUS,
+												BANKTXNID:post.BANKTXNID,
+												TXNDATE:post.TXNDATE,
+												CHECKSUMHASH:post.CHECKSUMHASH
+											});
+											TransactionObj.save();
+											
+											res.render("response.ejs", {resultData: "true", responseData: success});
+										}
+									});
+								}
+								else
+								{
+									res.json({
+										status:409,
+										message:'Conflict'
+									}).send();
+								}
+							})
+						}
+					})
+        },
+        error => {
+            res.send(error);
+        }
+    );
+});
+
+API.post('/place-order-business',(req,res,next)=>{
+	var post = req.body;
+
+	var obj = new Order({
+		Customer_Id:post.Customer_Id,
+		Country_Code:post.Country_Code,
+		Phone_Number:post.Phone_Number,
+		Name:post.Name,	
+		Type:post.Type,
+		Category:post.Category,
+		Address:post.Address,
+		Amount:post.Amount
+	})
+	
+	obj.save(function(err,data){
+		if(err)
+		{
+			res.json({
+				status:500,
+				message:'Internal Server Error'
+			}).send();
+		}
+		else
+		{
+			res.json({
+				status:200,
+				message:'Success',
+				order_id:data._id
+			}).send();
+		}
+	})		
+})
 
 
+API.post('/place-order-service',(req,res,next)=>{
+	var post = req.body;
 
+	var obj = new Service_Order({
+		Customer_Id:post.Customer_Id,
+		Business_Id:post.Business_Id,
+		Amount:post.Amount
+	})
+	
+	obj.save(function(err,data){
+		if(err)
+		{
+			res.json({
+				status:500,
+				message:'Internal Server Error'
+			}).send();
+		}
+		else
+		{
+			res.json({
+				status:200,
+				message:'Success',
+				service_order_id:data._id
+			}).send();
+		}
+	})		
+})
 
 
 API.post('/register-user',(req,res,next)=>{
@@ -117,39 +334,6 @@ API.post('/register-user',(req,res,next)=>{
 })
 
 
-API.post('/fetch-all-businesses-registerd-on-phone-number',(req,res,next)=>{
-	var post=req.body;
-	
-	Business.find({
-						Phone_Number:post.Phone_Number, 
-						Country_Code:post.Country_Code
-					},function(err,data){
-						if(err)
-						{
-							res.json({
-									status:500,
-									message:'Internal Server Error'
-								}).send();
-						}
-						else if(data.length==0)
-						{
-							res.json({
-								status:404,
-								message:'Not Found'
-							}).send();
-						}
-						else
-						{
-							res.json({
-								status:200,
-								message:'Success',
-								businesses:data
-							}).send();
-						}
-					})
-})
-
-
 API.post('/create-new-business',(req,res,next)=>{
 	var post=req.body;
 	
@@ -159,7 +343,8 @@ API.post('/create-new-business',(req,res,next)=>{
 		Name:post.Name,	
 		Type:post.Type,
 		Category:post.Category,
-		Address:post.Address
+		Address:post.Address,
+		Status:true
 	});
 	
 	Business.find(obj,function(err,data){
@@ -200,10 +385,14 @@ API.post('/create-new-business',(req,res,next)=>{
 					})
 })
 
-API.post('/remove-business',(req,res,next)=>{
-	var post=req.body;
 
-	Business.deleteMany({_id:{$in:post.Business_Ids}},function(err1,data1){
+API.post('/fetch-all-businesses-registerd-on-phone-number',(req,res,next)=>{
+	var post=req.body;
+		
+	Business.find({
+						Phone_Number:post.Phone_Number, 
+						Country_Code:post.Country_Code
+					},function(err1,data1){
 						if(err1)
 						{
 							res.json({
@@ -211,26 +400,154 @@ API.post('/remove-business',(req,res,next)=>{
 									message:'Internal Server Error'
 								}).send();
 						}
+						else if(data1.length==0)
+						{
+							res.json({
+								status:404,
+								message:'Not Found'
+							}).send();
+						}
 						else
 						{
-							Item.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err2,data2){
-								if(err2)
-								{
-									res.json({
-										status:500,
-										message:'Internal Server Error'
-									}).send();
-								}
-								else
-								{
-									res.json({
-										status:200,
-										message:'Success'
-									}).send();
-								}
-							})
+							var ans=[];
+							var n = data1.length;
+							var syncLoop = require('sync-loop');
+							
+							syncLoop(n, function (loop) {
+							  
+							  var i = loop.iteration();
+							  
+									var state_temp;
+									var obj = data1[i];
+									
+									let promise = new Promise((resolve,reject)=>{
+										Service_Expiry.findOne({Business_Id:obj._id},function(err2,data2){
+											if(err2)
+											{
+												resolve({"status":"200"});
+											}
+											else
+											{	
+												var date = new Date();
+												if(date <= data2.Service_Period_End)
+													state_temp = true;
+												else
+													state_temp = false;
+												
+												obj.State = state_temp
+												var x = {"State":state_temp,"Obj":obj}
+												ans.push(x);
+												resolve({"status":"200"});
+											}
+										});	
+									});
+									
+									promise.then((result)=>{
+										loop.next();
+									})
+									.catch((error)=>{
+										console.log("error in promise "+error);
+									})
+							  
+							}, function () {
+								
+								res.status(200).json({
+											message:'Success',
+											businesses:ans
+										}).send();
+							});
+						
 						}
+					})						
+})
+
+
+API.post('/remove-business',(req,res,next)=>{
+	var post=req.body;
+
+	let promise1 = new Promise((resolve,reject)=>{		
+		Business.deleteMany({_id:{$in:post.Business_Ids}},function(err,data){
+			if(err)
+				reject();
+			else
+				resolve();
+		})
+	})
+	
+	let promise2 = new Promise((resolve,reject)=>{	
+		Item.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err,data){
+			if(err)
+				reject();
+			else
+				resolve();
+		})
+	})
+	
+	let promise3 = new Promise((resolve,reject)=>{
+		Service_Expiry.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err,data){
+			if(err)
+				reject();
+			else
+				resolve();
+		})			
+	})
+	
+	let promise4 = new Promise((resolve,reject)=>{
+		Service_Order.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err,data){
+			if(err)
+				reject();
+			else
+				resolve();
+		})			
+	})	
+		
+	let promise5 = new Promise((resolve,reject)=>{
+		Transaction.deleteMany({Business_Id:{$in:post.Business_Ids}},function(err,data){
+			if(err)
+				reject();
+			else
+				resolve();
+		})			
+	})	
+		
+	promise1.then((result)=>{	
+		promise2.then((result)=>{
+			promise3.then((result)=>{
+				promise4.then((result)=>{
+					promise5.then((result)=>{
+						res.status(200).json({
+							message:"Success"
+						}).send();
 					})
+					.catch((error)=>{
+						res.status(500).json({
+							message:"Internal Server Error"
+						}).send();
+					})
+				})
+				.catch((error)=>{
+					res.status(500).json({
+						message:"Internal Server Error"
+					}).send();
+				})
+			})
+			.catch((error)=>{
+				res.status(500).json({
+					message:"Internal Server Error"
+				}).send();
+			})
+		})
+		.catch((error)=>{
+			res.status(500).json({
+				message:"Internal Server Error"
+			}).send();
+		})	
+	})					
+	.catch((error)=>{
+		res.status(500).json({
+			message:"Internal Server Error"
+		}).send();
+	})
 })
 
 API.post('/query',(req,res,next)=>{
