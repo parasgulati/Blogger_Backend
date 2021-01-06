@@ -37,5 +37,5 @@ var BlogRoute = require("./route/Blog.js");
 API.use('/user',UserRoute);
 API.use('/blog',BlogRoute);
 
-var port =process.env.PORT || 3000;
+var port =process.env.PORT;
 API.listen(port);
