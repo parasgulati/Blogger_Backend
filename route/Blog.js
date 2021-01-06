@@ -73,9 +73,40 @@ function validate_blog_create(req,res,next)
     }
 }
 
-router.post('/create',verify_jwt,validate_blog_create,BlogController.create);
-router.get('/fetch-based-upon-time',BlogController.fetchBasedOnTime);
-router.post('/fetch-user',verify_jwt,BlogController.fetchUser);
-router.get('/fetch-tag',BlogController.fetchTag);
+
+function AuthenticatePOST(req,res,next)
+{
+    if(process.env.API_KEY==req.body.API_KEY)
+    {
+        next();
+    }
+    else
+    {
+        res.json({
+            status:403,
+            message:"Forbidden"
+        }).send();
+    }
+}
+
+function AuthenticateGET(req,res,next)
+{
+    if(process.env.API_KEY==req.query.API_KEY)
+    {
+        next();
+    }
+    else
+    {
+        res.json({
+            status:403,
+            message:"Forbidden"
+        }).send();
+    }
+}
+
+router.post('/create',AuthenticatePOST,verify_jwt,validate_blog_create,BlogController.create);
+router.get('/fetch-based-upon-time',AuthenticateGET,BlogController.fetchBasedOnTime);
+router.post('/fetch-user',AuthenticatePOST,verify_jwt,BlogController.fetchUser);
+router.get('/fetch-tag',AuthenticateGET,BlogController.fetchTag);
 
 module.exports = router;

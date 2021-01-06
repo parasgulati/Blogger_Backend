@@ -31,28 +31,11 @@ API.use(bodyParser.json());
 // adding body-parser URL Encoded middleware for accessing URLEncoded data
 API.use(bodyParser.urlencoded({extended: false}));
 
-function Authenticate(req,res,next)
-{
-    if(process.env.API_KEY==req.body.API_KEY)
-    {
-        next();
-    }
-    else
-    {
-        res.json({
-            status:403,
-            message:"Forbidden"
-        }).send();
-    }
-}
-
-
-
 var UserRoute = require("./route/User.js")
 var BlogRoute = require("./route/Blog.js");
 
-API.use('/user',Authenticate,UserRoute);
-API.use('/blog',Authenticate,BlogRoute);
+API.use('/user',UserRoute);
+API.use('/blog',BlogRoute);
 
 var port =process.env.PORT || 3000;
 API.listen(port);

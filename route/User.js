@@ -59,7 +59,37 @@ function validate_signup(req,res,next)
     }
 }
 
-router.post('/signup',validate_signup,UserController.signup);
-router.post('/login',validate_login,UserController.login);
+function AuthenticatePOST(req,res,next)
+{
+    if(process.env.API_KEY==req.body.API_KEY)
+    {
+        next();
+    }
+    else
+    {
+        res.json({
+            status:403,
+            message:"Forbidden"
+        }).send();
+    }
+}
+
+function AuthenticateGET(req,res,next)
+{
+    if(process.env.API_KEY==req.query.API_KEY)
+    {
+        next();
+    }
+    else
+    {
+        res.json({
+            status:403,
+            message:"Forbidden"
+        }).send();
+    }
+}
+
+router.post('/signup',AuthenticatePOST,validate_signup,UserController.signup);
+router.post('/login',AuthenticatePOST,validate_login,UserController.login);
 
 module.exports = router;
